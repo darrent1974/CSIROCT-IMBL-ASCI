@@ -13,7 +13,7 @@ install:
 
 script:
   - pycodestyle csiroct_imbl_asci
-  - pytest --verbose --capture=no somepackage
+  - pytest --verbose --capture=no csiroct_imbl_asci
   - pip install .
 
 notifications:

@@ -19,11 +19,11 @@ else:
         long_description = f.read()
 
 version = {}
-with open(os.path.join(_here, 'csiroct-imbl-asci', 'version.py')) as f:
+with open(os.path.join(_here, 'csiroct_imbl_asci', 'version.py')) as f:
     exec(f.read(), version)
 
 setup(
-    name='csiroct-imbl-asci',
+    name='csiroct_imbl_asci',
     version=version['__version__'],
     description=('CSIROCT IMBL ASCI library.'),
     long_description=long_description,
@@ -31,7 +31,7 @@ setup(
     author_email='darren.thompson@csiro.au',
     url='https://github.com/darrent1974/CSIROCT-IMBL-ASCI',
     license='GPL-3.0',
-    packages=['csiroct-imbl-asci'],
+    packages=['csiroct_imbl_asci'],
     install_requires=[
         'numpy',
         'h5py',

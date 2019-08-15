@@ -12,7 +12,7 @@ install:
   - pip install -r requirements.txt
 
 script:
-  - pycodestyle csiroct-imbl-asci
+  - pycodestyle csiroct_imbl_asci
   - pytest --verbose --capture=no somepackage
   - pip install .
 

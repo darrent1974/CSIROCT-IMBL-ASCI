@@ -1,0 +1,20 @@
+sudo: false
+
+language:
+  - python
+
+python:
+  - 2.7
+  - 3.6
+  - 3.7
+
+install:
+  - pip install -r requirements.txt
+
+script:
+  - pycodestyle csiroct-imbl-asci
+  - pytest --verbose --capture=no somepackage
+  - pip install .
+
+notifications:
+  email: false

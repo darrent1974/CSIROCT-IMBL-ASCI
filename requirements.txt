@@ -1,0 +1,5 @@
+pytest
+pycodestyle
+
+numpy
+h5py

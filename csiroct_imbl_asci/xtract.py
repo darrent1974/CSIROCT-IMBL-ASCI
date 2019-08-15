@@ -33,7 +33,7 @@ def run_xli_cmd( dict_params, cmd_xli ):
     
     print( list_cmd )
 
-    proc = subprocess.Popen( listCmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
+    proc = subprocess.Popen( list_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
 
     stdout,stderr = proc.communicate()
     

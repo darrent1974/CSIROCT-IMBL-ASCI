@@ -17,7 +17,9 @@ def create_test_epics_hdf5(file_test_epics):
     # Create test EPICS HDF5 file
     with h5py.File(file_test_epics, 'w') as f_test_epics:
         # Create a small test dataset from a numpy array
-        arr = np.arange((100 * 10 * 10), dtype=np.uint16).reshape((100, 10, 10))
+        arr = np.arange(
+            (100 * 10 * 10),
+            dtype=np.uint16).reshape((100, 10, 10))
 
         dset = f_test_epics.create_dataset(convert.h5_dataset_epics, data=arr)
         check_dataset_shape_type(dset, (100, 10, 10), np.uint16)
@@ -51,7 +53,7 @@ def test_convert_epics_to_xtract_hdf5_no_stride(tmp_path):
         dset_flats = f_test_xtract[xtract.h5_dataset_xtract_flats]
         check_dataset_shape_type(dset_flats, (100, 10, 10), np.uint16)
 
-        dset_darks = f_test_xtract[xtract.h5_dataset_xtract_darks]      
+        dset_darks = f_test_xtract[xtract.h5_dataset_xtract_darks]
         check_dataset_shape_type(dset_darks, (100, 10, 10), np.uint16)
 
         dset_projections = f_test_xtract[xtract.h5_dataset_xtract_projections]
@@ -82,7 +84,7 @@ def test_convert_epics_to_xtract_hdf5_stride(tmp_path):
         dset_flats = f_test_xtract[xtract.h5_dataset_xtract_flats]
         check_dataset_shape_type(dset_flats, (100, 10, 10), np.uint16)
 
-        dset_darks = f_test_xtract[xtract.h5_dataset_xtract_darks]      
+        dset_darks = f_test_xtract[xtract.h5_dataset_xtract_darks]
         check_dataset_shape_type(dset_darks, (100, 10, 10), np.uint16)
 
         dset_projections = f_test_xtract[xtract.h5_dataset_xtract_projections]

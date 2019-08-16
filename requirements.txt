@@ -1,5 +1,6 @@
 pytest
 pycodestyle
+sphinx
 
 numpy
 h5py

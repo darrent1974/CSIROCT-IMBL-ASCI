@@ -1,6 +1,6 @@
 from .version import __version__
 from .convert import convert_epics_to_xtract_hdf5
-from .xtract import get_num_projections 
+from .xtract import get_num_projections
 from .xtract import assemble_command
 from .xtract import run_XLICTPreProc
 from .xtract import run_XLICTWorkflow

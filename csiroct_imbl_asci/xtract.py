@@ -35,7 +35,7 @@ def assemble_command(file_command, dict_args) -> list:
     """
     list_cmd = [file_command]
 
-    arg, val in dict_args.items():
+    for arg, val in dict_args.items():
         list_cmd.append('--{0}'.format(arg))
         list_cmd.append(val)
 

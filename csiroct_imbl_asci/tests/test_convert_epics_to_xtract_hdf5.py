@@ -25,8 +25,7 @@ def create_test_epics_hdf5(file_test_epics):
         check_dataset_shape_type(dset, (100, 10, 10), np.uint16)
 
     # Check that the file was created succesfully
-    assert if:
-        os.path.isfile(file_test_epics)
+    assert if os.path.isfile(file_test_epics) is True
 
 
 def test_convert_epics_to_xtract_hdf5_no_stride(tmp_path):
@@ -44,8 +43,7 @@ def test_convert_epics_to_xtract_hdf5_no_stride(tmp_path):
             file_test_xtract)
 
     # Check that the file was created succesfully
-    assert if:
-        os.path.isfile(file_test_xtract)
+    assert if os.path.isfile(file_test_xtract) is True
 
     # Open the converted file to test the contents
     with h5py.File(file_test_xtract, 'r') as f_test_xtract:
@@ -75,8 +73,7 @@ def test_convert_epics_to_xtract_hdf5_stride(tmp_path):
             file_test_xtract, 10, 10)
 
     # Check that the file was created succesfully
-    assert if:
-        os.path.isfile(file_test_xtract)
+    assert if os.path.isfile(file_test_xtract) is True
 
     # Open the converted file to test the contents
     with h5py.File(file_test_xtract, 'r') as f_test_xtract:

@@ -1,18 +1,20 @@
 sudo: false
-
 language: python
-
 python:
-  - "3.6"
-  - "3.7"
-
+- '3.6'
+- '3.7'
 install:
-  - pip install -r requirements.txt
-
+- pip install -r requirements.txt
 script:
-  - pycodestyle csiroct_imbl_asci
-  - pytest --verbose --capture=no csiroct_imbl_asci
-  - pip install .
-
+- pycodestyle csiroct_imbl_asci
+- pytest --verbose --capture=no csiroct_imbl_asci
+- pip install .
+deploy:
+  provider: pypi
+  user: darrent1974
+  on:
+    tags: true
+  password:
+    secure: Ub+OWpaemlL8lQ1/mpWrgKq9EcznmfpTg/t7O4i77I7qdWAG4bBaT8RnI+uVPCANMBSDdMB1h8byOLETyjuU/XrBd0rKJBHQLOQUFwuQ9coBCU4XFKDLS6cFHE9ILLPtTu326/HW15aquhi2yObn6xCWmaJXEZDQMd+MLvZUhkRlug9m/WP4jycuyQMJSHzwfsBAn0ertQLWwQfRZYpJMAC4TyDUh6yed9WhUFGT6hwuoh+DaaI087P7cF6+6qiyOU+rN0d5KEZHJr4B3KPdIYMpFUdpyl4CSu75w1/KAuwPmZkLzVFyLevAxr7vzRscJWq+KyhOOlGvEsJdgQAawCUDxkxlwsxWSoRoKLZRLr6OSLTxb9nuy5SzuY/hI3w+vcTh8hl8rW60oXQzQY3coLCXzrEaJtQDXIbGrr6d2oUyWS128eLOEZK/xdf6U4TE4HNM+ARoqIkA0lECbi6YmqK8fhw5LvnkvNFiW5lEwZ5b/ZLqV22wQCZZ7PnUM5rHRwuAeOqdHyC5i+cwndzv7SACGtMSvrk5jPuiR9G+iYRJowx+vkM8oEoF09h2K0ddl4jop/eF5J1bmPGOeBAAbp8DGde8HN4ssaeKy6M9uFJuDUB+zSo9GBHEAAOzHu6IxlTDolfAkR2BCumFBdBx8JiwOss2fnJrj/9ZdrDh4Es=
 notifications:
   email: false

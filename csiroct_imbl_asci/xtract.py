@@ -4,13 +4,14 @@ import h5py
 import subprocess
 import os
 import os.path
+import logging
 
 """Module constants"""
 h5_group_xtract_exchange = 'exchange'
 h5_dataset_xtract_projections = 'exchange/data'
 h5_dataset_xtract_flats = 'exchange/data_flat'
 h5_dataset_xtract_darks = 'exchange/data_dark'
-h5_dataset_xtract_sinograms = 'exchange/data'
+h5_dataset_xtract_sinograms = 'exchange/data_sino'
 
 
 def assemble_command(file_command, dict_args) -> list:
@@ -79,6 +80,21 @@ def create_config_dictionary(file_config) -> dict:
     raise NotImplemented()
 
 
+def execute(cmd):
+    popen = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE,
+        universal_newlines=True)
+
+    for stdout_line in iter(popen.stdout.readline, ''):
+        yield stdout_line
+
+    popen.stdout.close()
+    return_code = popen.wait()
+
+    if return_code:
+        raise subprocess.CalledProcessError(return_code, cmd)
+
+
 def run_xli_cmd(dict_params, cmd_xli):
     """Run the specified X-TRACT (XLI) executable with the given
     dictionary of parameters
@@ -91,23 +107,12 @@ def run_xli_cmd(dict_params, cmd_xli):
     cmd_xli : str
         String specifying the full path of the
         X-TRACT executable
-
-    Returns
-    -------
-    str, str
-        Strings of the processes stdout and stderr
     """
     list_cmd = assemble_command(cmd_xli, dict_params)
     logging.debug('run_xli_cmd, cmd - %s', list_cmd)
 
-    proc = subprocess.Popen(
-        list_cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT)
-
-    stdout, stderr = proc.communicate()
-
-    return stdout, stderr
+    for path in execute(list_cmd):
+        print(path, end='')
 
 
 def run_XLICTPreProc(dict_params, cmd_non_env=None):
@@ -124,11 +129,6 @@ def run_XLICTPreProc(dict_params, cmd_non_env=None):
         XLICTPreProc executable (default=None).
         By default the the path is formed from environment
         variables.
-
-    Returns
-    -------
-    str, str
-        Strings of the processes stdout and stderr
     """
     if cmd_non_env is None:
         # Construct command from environment variables
@@ -138,7 +138,7 @@ def run_XLICTPreProc(dict_params, cmd_non_env=None):
     else:
         cmd = cmd_non_env
 
-    return run_xli_cmd(dict_params, cmd)
+    run_xli_cmd(dict_params, cmd)
 
 
 def run_XLICTWorkflow(dict_params, cmd_non_env=None):
@@ -155,11 +155,6 @@ def run_XLICTWorkflow(dict_params, cmd_non_env=None):
         XLICTWorkflow executable (default=None).
         By default the the path is formed from environment
         variables.
-
-    Returns
-    -------
-    str, str
-        Strings of the processes stdout and stderr
     """
     if cmd_non_env is None:
         # Construct command from environment variables
@@ -169,7 +164,7 @@ def run_XLICTWorkflow(dict_params, cmd_non_env=None):
     else:
         cmd = cmd_non_env
 
-    return run_xli_cmd(dict_params, cmd)
+    run_xli_cmd(dict_params, cmd)
 
 
 def run_XLICTRecon(dict_params, cmd_non_env=None):
@@ -186,11 +181,6 @@ def run_XLICTRecon(dict_params, cmd_non_env=None):
         XLICTRecon executable (default=None).
         By default the the path is formed from environment
         variables.
-
-    Returns
-    -------
-    str, str
-        Strings of the processes stdout and stderr
     """
     if cmd_non_env is None:
         # Construct command from environment variables
@@ -200,7 +190,7 @@ def run_XLICTRecon(dict_params, cmd_non_env=None):
     else:
         cmd = cmd_non_env
 
-    return run_xli_cmd(dict_params, cmd)
+    run_xli_cmd(dict_params, cmd)
 
 
 def run_XLICOR(dict_params, cmd_non_env=None):
@@ -217,11 +207,6 @@ def run_XLICOR(dict_params, cmd_non_env=None):
         XLICOR executable (default=None).
         By default the the path is formed from environment
         variables.
-
-    Returns
-    -------
-    str, str
-        Strings of the processes stdout and stderr
     """
     if cmd_non_env is None:
         # Construct command from environment variables
@@ -231,4 +216,4 @@ def run_XLICOR(dict_params, cmd_non_env=None):
     else:
         cmd = cmd_non_env
 
-    return run_xli_cmd(dict_params, cmd)
+    run_xli_cmd(dict_params, cmd)

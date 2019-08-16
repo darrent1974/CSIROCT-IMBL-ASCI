@@ -1,6 +1,7 @@
 pytest
 pycodestyle
 sphinx
-
 numpy
 h5py
+matplotlib
+jupyter

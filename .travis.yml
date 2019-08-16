@@ -13,6 +13,8 @@ deploy:
   provider: pypi
   user: __token__
   password: pypi-AgEIcHlwaS5vcmcCJDcxNzc3YzU3LTUyNDgtNDU5Ni1hOWQyLTQ1ODU2NTc2YWM3ZQACJXsicGVybWlzc2lvbnMiOiAidXNlciIsICJ2ZXJzaW9uIjogMX0AAAYgvFyDbW4jZ9vK0IL-olBN9asp2vgpz9efkAIii9HUXUA
+  distributions: bdist_wheel
+  skip_existing: true
   on:
     tags: true
 notifications:

@@ -11,6 +11,219 @@ file_imbl_h5_flat = 'BG_BEFORE.hdf'
 file_imbl_h5_dark = 'DF_BEFORE.hdf'
 file_imbl_h5_sample = 'SAMPLE.hdf'
 h5_dataset_epics = 'entry/data/data'
+h5_extension = '.h5'
+
+
+def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
+                              file_output_prefix, sample_sets=1,
+                              read_buffer_gb=20) -> int:
+    """Convert specified EPICS HDF5 flat, dark and strided XV samples
+    into a series of X-TRACT compatible HDF5 files.
+
+    Parameters
+    ----------
+    file_flat : str
+        Filename of EPICS HDF5 for flats
+    file_dark : str
+        Filename of EPICS HDF5 for flats
+    file_sample_xv : str
+        Filename of EPICS HDF5 for XV samples
+    file_output_prefix : str
+        Filename of output X-TRACT HDF5
+    sample_sets : int, optional
+        Number of sample projection sets
+        (default=1)
+    read_buffer_gb : int, optional
+        Internal read buffer size (GB)
+        (default=20)
+
+    Returns
+    -------
+    int
+        The number of files created
+    """
+
+    logging.debug(
+        'convert_xv_to_xtract_hdf5, sample_sets = %d', sample_sets)
+
+    # Define empty arrays for flats and darks
+    arr_flat = None
+    arr_dark = None
+
+    # Cacluate the required max read buffer in bytes
+    max_buffer_size = read_buffer_gb * (1024 ** 3)
+
+    # Open input IMBL (EPICS) flat HDF5 file
+    with h5py.File(file_flat, 'r') as in_flat:
+        logging.debug('Opened flat - %s', file_flat)
+        # Read the entire dataset
+        arr_flat = in_flat[h5_dataset_epics][:, :, :]
+        logging.debug('Read flat dataset')
+
+    # Open input IMBL (EPICS) dark HDF5 file
+    with h5py.File(file_dark, 'r') as in_dark:
+        logging.debug('Opened dark - %s', file_dark)
+        # Read the entire dataset
+        arr_dark = in_dark[h5_dataset_epics][:, :, :]
+        logging.debug('Read dark dataset')
+
+    # Open input IMBL (EPICS) xv sample HDF5 file
+    with h5py.File(file_sample_xv, 'r') as in_sample:
+        logging.debug('Opened sample - %s', file_sample_xv)
+
+        dset_sample = in_sample[h5_dataset_epics]
+
+        max_proj_idx = dset_sample.shape[0]
+
+        # Check that the z-dimension matches the number of sample sets.
+        # If not, adjust it by truncating left over projections
+        if dset_sample.shape[0] % sample_sets != 0:
+            max_proj_idx = dset_sample.shape[0] - (dset_sample.shape[0] %
+                                                   sample_sets)
+
+            logging.debug('Truncating projections from %d to %d',
+                          dset_sample.shape[0],
+                          max_proj_idx)
+
+        # Size of each sample set
+        sample_set_size = max_proj_idx // sample_sets
+
+        # Zero padding length, for filename generation
+        pad_length = len(str(sample_sets))
+
+        # Compute the size of a single projection in bytes
+        proj_size = (dset_sample.shape[1] *
+                     dset_sample.shape[2] *
+                     dset_sample.dtype.itemsize)
+
+        # Size of the sample in bytes
+        sample_size = max_proj_idx * proj_size
+
+        # Compute how many partitions the sample set will
+        # need to be split into based on the size of the
+        # desired read buffer
+        num_partitions = sample_size // max_buffer_size
+
+        # Account for left-overs
+        if (sample_size % max_buffer_size) > 0:
+            num_partitions += 1
+
+        # Construct an array of projections partitioned to
+        # fit within the specified read buffer
+        proj_partitions = numpy.array_split(numpy.arange(max_proj_idx),
+                                            num_partitions)
+        h5_files = []
+        h5_datasets = []
+
+        # First loop, create and add flats/darks to output HDF5 files
+        for i in range(sample_sets):
+            filename = '%s%s%s' % (file_output_prefix,
+                                   str(i).zfill(pad_length),
+                                   h5_extension)
+
+            # Create HDF5 file for writing
+            h5_file = h5py.File(filename, 'w')
+
+            # Append HDF5 file object
+            h5_files.append(h5_file)
+            logging.debug('Created file - %s', filename)
+
+            # Create and store flats
+            h5_file.create_dataset(
+                xtract.h5_dataset_xtract_flats,
+                data=arr_flat)
+
+            logging.debug(
+                'Created dataset - %s',
+                xtract.h5_dataset_xtract_flats)
+
+            # Create and store darks
+            h5_file.create_dataset(
+                xtract.h5_dataset_xtract_darks,
+                data=arr_dark)
+
+            logging.debug(
+                'Created dataset - %s',
+                xtract.h5_dataset_xtract_darks)
+
+            # Flush flats and darks
+            h5_file.flush()
+
+            # Create sample dataset, chunked for projections
+            dset = h5_file.create_dataset(
+                xtract.h5_dataset_xtract_projections,
+                (sample_set_size,
+                 dset_sample.shape[1],
+                 dset_sample.shape[2]),
+                chunks=(1, dset_sample.shape[1], dset_sample.shape[2]),
+                dtype=dset_sample.dtype)
+
+            h5_datasets.append(dset)
+
+        index_sample_set = numpy.zeros(sample_sets, dtype=int)
+
+        # Loop over the projection partitions
+        for proj_part in proj_partitions:
+            # Read the projections in the given partition
+            arr_proj_part = (
+                dset_sample[proj_part[0]:proj_part[-1]+1])
+
+            logging.debug(
+                'Read projections %d to %d of %d',
+                proj_part[0], proj_part[-1], max_proj_idx)
+
+            # Write projections from the partition to
+            # the corresponding sample set file
+            for index_file in range(sample_sets):
+                # Create an array copy of the sliced input partition
+                # for the sample set, it's quicker to create a
+                # contiguous copy rather than using a view and specifying
+                # a source selection in the call to write_direct below
+                arr_proj_sample = arr_proj_part[index_file:
+                                                arr_proj_part.shape[1]-1:
+                                                sample_sets].copy()
+
+                # Determine the how many projections are in the
+                # associated view for this sample set
+                sample_set_partition_size = arr_proj_sample.shape[0]
+
+                # Define s destination selection for the sample
+                # set in the output file
+                dest_sel = numpy.s_[index_sample_set[index_file]:
+                                    (index_sample_set[index_file] +
+                                     sample_set_partition_size)]
+
+                # Write projection partition directly into the
+                # associated output file for the sample set
+                h5_datasets[index_file].write_direct(
+                    arr_proj_sample,
+                    dest_sel=dest_sel)
+
+                # Flush the HDF5 file
+                h5_files[index_file].flush()
+
+                logging.debug(
+                    'Written file, sample %d, projections %d to %d',
+                    index_file,
+                    index_sample_set[index_file],
+                    index_sample_set[index_file] + sample_set_partition_size)
+
+                # Update the index for writing sample set
+                index_sample_set[index_file] += sample_set_partition_size
+
+            logging.debug(
+                'Written projections %d to %d of %d',
+                proj_part[0], proj_part[-1], max_proj_idx)
+
+        logging.debug('Flushing and closing HDF5 files')
+        # Third loop, cleanup
+        for h5_file in h5_files:
+            h5_file.flush()
+            h5_file.close()
+
+        logging.debug('Conversion complete')
+
+    return sample_sets
 
 
 def convert_epics_to_xtract_hdf5(file_flat, file_dark, file_sample,

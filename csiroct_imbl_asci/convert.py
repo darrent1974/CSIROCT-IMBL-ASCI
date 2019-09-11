@@ -99,7 +99,7 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
                      dset_sample.dtype.itemsize)
 
         buffer_time_points = max_buffer_size // (proj_size * time_points)
-        adjusted_buffer_size = buffer_time_points * (proj_size * time_points)  
+        adjusted_buffer_size = buffer_time_points * (proj_size * time_points)
 
         # Size of the sample in bytes
         sample_size = max_proj_idx * proj_size
@@ -200,12 +200,14 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
                 # for the sample set, it's quicker to create a
                 # contiguous copy rather than using a view and specifying
                 # a source selection in the call to write_direct below
-                arr_proj_time_point = arr_proj_part[index_file:
-                                                    proj_part.size - time_points + index_file:
-                                                    time_points].copy()
+                arr_proj_time_point = arr_proj_part[
+                    index_file:
+                    proj_part.size - time_points + index_file:
+                    time_points].copy()
 
-                #if index_file == 0:
-                #   imsave('proj_{0}_{1}'.format(index_file,part_idx), arr_proj_time_point[0])                
+                # if index_file == 0:
+                #   imsave('proj_{0}_{1}'.format(index_file,part_idx),
+                #           arr_proj_time_point[0])
 
                 # Determine the how many projections are in the
                 # associated view for this time point
@@ -221,7 +223,7 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
                     'Writing file, time point %d, projections %d to %d',
                     index_file,
                     index_time_point[index_file],
-                    index_time_point[index_file] + time_point_partition_size - 1)                     
+                    index_time_point[index_file]+time_point_partition_size-1)
 
                 # Write projection partition directly into the
                 # associated output file for the time point
@@ -230,7 +232,7 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
                     dest_sel=dest_sel)
 
                 # Flush the HDF5 file
-                #h5_files[index_file].flush()
+                # h5_files[index_file].flush()
 
                 # Update the index for writing sample set
                 index_time_point[index_file] += time_point_partition_size

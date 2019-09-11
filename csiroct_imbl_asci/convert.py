@@ -6,6 +6,8 @@ import logging
 import numpy
 import csiroct_imbl_asci.xtract as xtract
 
+from tifffile import imsave
+
 """Module constants"""
 file_imbl_h5_flat = 'BG_BEFORE.hdf'
 file_imbl_h5_dark = 'DF_BEFORE.hdf'
@@ -15,7 +17,7 @@ h5_extension = '.h5'
 
 
 def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
-                              file_output_prefix, sample_sets=1,
+                              file_output_prefix, time_points=1,
                               read_buffer_gb=20) -> int:
     """Convert specified EPICS HDF5 flat, dark and strided XV samples
     into a series of X-TRACT compatible HDF5 files.
@@ -30,8 +32,8 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
         Filename of EPICS HDF5 for XV samples
     file_output_prefix : str
         Filename of output X-TRACT HDF5
-    sample_sets : int, optional
-        Number of sample projection sets
+    time_points : int, optional
+        Number of sample time points
         (default=1)
     read_buffer_gb : int, optional
         Internal read buffer size (GB)
@@ -44,7 +46,7 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
     """
 
     logging.debug(
-        'convert_xv_to_xtract_hdf5, sample_sets = %d', sample_sets)
+        'convert_xv_to_xtract_hdf5, time_points = %d', time_points)
 
     # Define empty arrays for flats and darks
     arr_flat = None
@@ -75,26 +77,29 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
 
         max_proj_idx = dset_sample.shape[0]
 
-        # Check that the z-dimension matches the number of sample sets.
+        # Check that the z-dimension matches the number of time points.
         # If not, adjust it by truncating left over projections
-        if dset_sample.shape[0] % sample_sets != 0:
+        if dset_sample.shape[0] % time_points != 0:
             max_proj_idx = dset_sample.shape[0] - (dset_sample.shape[0] %
-                                                   sample_sets)
+                                                   time_points)
 
             logging.debug('Truncating projections from %d to %d',
                           dset_sample.shape[0],
                           max_proj_idx)
 
-        # Size of each sample set
-        sample_set_size = max_proj_idx // sample_sets
+        # Number of projections for each time point
+        num_proj_time_point = max_proj_idx // time_points
 
         # Zero padding length, for filename generation
-        pad_length = len(str(sample_sets))
+        pad_length = len(str(time_points))
 
         # Compute the size of a single projection in bytes
         proj_size = (dset_sample.shape[1] *
                      dset_sample.shape[2] *
                      dset_sample.dtype.itemsize)
+
+        buffer_time_points = max_buffer_size // (proj_size * time_points)
+        adjusted_buffer_size = buffer_time_points * (proj_size * time_points)  
 
         # Size of the sample in bytes
         sample_size = max_proj_idx * proj_size
@@ -102,21 +107,25 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
         # Compute how many partitions the sample set will
         # need to be split into based on the size of the
         # desired read buffer
-        num_partitions = sample_size // max_buffer_size
+        num_partitions = sample_size // adjusted_buffer_size
 
         # Account for left-overs
-        if (sample_size % max_buffer_size) > 0:
+        if (sample_size % adjusted_buffer_size) > 0:
             num_partitions += 1
 
         # Construct an array of projections partitioned to
         # fit within the specified read buffer
         proj_partitions = numpy.array_split(numpy.arange(max_proj_idx),
                                             num_partitions)
+
+        logging.debug('Number of partitions: %d', len(proj_partitions))
+
         h5_files = []
         h5_datasets = []
 
         # First loop, create and add flats/darks to output HDF5 files
-        for i in range(sample_sets):
+        for i in range(time_points):
+
             filename = '%s%s%s' % (file_output_prefix,
                                    str(i).zfill(pad_length),
                                    h5_extension)
@@ -152,7 +161,7 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
             # Create sample dataset, chunked for projections
             dset = h5_file.create_dataset(
                 xtract.h5_dataset_xtract_projections,
-                (sample_set_size,
+                (num_proj_time_point,
                  dset_sample.shape[1],
                  dset_sample.shape[2]),
                 chunks=(1, dset_sample.shape[1], dset_sample.shape[2]),
@@ -160,60 +169,83 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
 
             h5_datasets.append(dset)
 
-        index_sample_set = numpy.zeros(sample_sets, dtype=int)
+        index_time_point = numpy.zeros(time_points, dtype=int)
 
         # Loop over the projection partitions
         for proj_part in proj_partitions:
-            # Read the projections in the given partition
-            arr_proj_part = (
-                dset_sample[proj_part[0]:proj_part[-1]+1])
 
             logging.debug(
-                'Read projections %d to %d of %d',
+                'Reading projections %d to %d of %d',
                 proj_part[0], proj_part[-1], max_proj_idx)
 
+            # Create an array to read into
+            arr_proj_part = numpy.zeros(
+                (proj_part.size, dset_sample.shape[1], dset_sample.shape[2]),
+                dtype=dset_sample.dtype)
+
+            # Define the source partition
+            source_sel = numpy.s_[proj_part[0]:proj_part[-1]+1]
+
+            # Read the projections in the given partition
+            dset_sample.read_direct(
+                arr_proj_part,
+                source_sel=source_sel)
+
+            logging.debug('Done')
+
             # Write projections from the partition to
-            # the corresponding sample set file
-            for index_file in range(sample_sets):
+            # the corresponding time point file
+            for index_file in range(time_points):
                 # Create an array copy of the sliced input partition
                 # for the sample set, it's quicker to create a
                 # contiguous copy rather than using a view and specifying
                 # a source selection in the call to write_direct below
-                arr_proj_sample = arr_proj_part[index_file:
-                                                arr_proj_part.shape[1]-1:
-                                                sample_sets].copy()
+                arr_proj_time_point = arr_proj_part[index_file:
+                                                    proj_part.size - time_points + index_file:
+                                                    time_points].copy()
+
+                #if index_file == 0:
+                #   imsave('proj_{0}_{1}'.format(index_file,part_idx), arr_proj_time_point[0])                
 
                 # Determine the how many projections are in the
-                # associated view for this sample set
-                sample_set_partition_size = arr_proj_sample.shape[0]
+                # associated view for this time point
+                time_point_partition_size = arr_proj_time_point.shape[0]
 
                 # Define s destination selection for the sample
                 # set in the output file
-                dest_sel = numpy.s_[index_sample_set[index_file]:
-                                    (index_sample_set[index_file] +
-                                     sample_set_partition_size)]
+                dest_sel = numpy.s_[index_time_point[index_file]:
+                                    (index_time_point[index_file] +
+                                     time_point_partition_size)]
+
+                logging.debug(
+                    'Writing file, time point %d, projections %d to %d',
+                    index_file,
+                    index_time_point[index_file],
+                    index_time_point[index_file] + time_point_partition_size - 1)                     
 
                 # Write projection partition directly into the
-                # associated output file for the sample set
+                # associated output file for the time point
                 h5_datasets[index_file].write_direct(
-                    arr_proj_sample,
+                    arr_proj_time_point,
                     dest_sel=dest_sel)
 
                 # Flush the HDF5 file
-                h5_files[index_file].flush()
-
-                logging.debug(
-                    'Written file, sample %d, projections %d to %d',
-                    index_file,
-                    index_sample_set[index_file],
-                    index_sample_set[index_file] + sample_set_partition_size)
+                #h5_files[index_file].flush()
 
                 # Update the index for writing sample set
-                index_sample_set[index_file] += sample_set_partition_size
+                index_time_point[index_file] += time_point_partition_size
+
+                # Force garbage collection to keep
+                # the memory footprint down
+                arr_proj_time_point = None
 
             logging.debug(
-                'Written projections %d to %d of %d',
+                'Written partition %d to %d of %d',
                 proj_part[0], proj_part[-1], max_proj_idx)
+
+            # Force garbage collection to keep
+            # the memory footprint down
+            arr_proj_part = None
 
         logging.debug('Flushing and closing HDF5 files')
         # Third loop, cleanup
@@ -223,7 +255,7 @@ def convert_xv_to_xtract_hdf5(file_flat, file_dark, file_sample_xv,
 
         logging.debug('Conversion complete')
 
-    return sample_sets
+    return time_points
 
 
 def convert_epics_to_xtract_hdf5(file_flat, file_dark, file_sample,
